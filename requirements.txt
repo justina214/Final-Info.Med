@@ -1,0 +1,2 @@
+fhir.resources==6.1.0  # Versión sugerida para recursos FHIR
+requests==2.31.0       # Para hacer solicitudes HTTP
