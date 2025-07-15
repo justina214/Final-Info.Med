@@ -93,4 +93,88 @@ for _, pac in df_pacientes.iterrows():
         print(f"   Condition: {condition_id or 'error'}")
 ```
 
-Este ajuste en workflow permite que se generen los pacientes a partir de un .csv
+Este ajuste en workflow permite que se generen los pacientes con sus respectivos atributos a partir de los 3 archivos .csv que conforman la base de datos
+
+workflow.py lee bases de datos en .csv y por cada paciente, construye y sube 5 recursos FHIR conectados entre sí:
+
+| Recurso FHIR  | Qué representa                     | Fuente CSV                             | Relación clave                      |
+| ------------- | ---------------------------------- | -------------------------------------- | ----------------------------------- |
+| `Patient`     | Datos personales del paciente      | `Base de datos - Pacientes..csv`       | ID\_pacientes                       |
+| `Location`    | Establecimiento donde fue atendido | `Base de datos - Establecimientos.csv` | establecimiento\_id                 |
+| `Encounter`   | Episodio de atención médica        | `Base de datos - Casos.csv`            | ID\_pacientes + establecimiento\_id |
+| `Observation` | Síntomas reportados                | `Base de datos - Casos.csv`            | ID\_pacientes                       |
+| `Condition`   | Diagnóstico confirmado/sospechoso  | `Base de datos - Casos.csv`            | ID\_pacientes                       |
+
+
+## Funcionamiento del flujo
+
+### Carga y limpieza de datos
+Se abren los 3 archivos `.csv` y se limpian los nombres de columnas (`strip()`)
+
+### Carga de Location
+
+Se recorren todos los establecimientos, cada uno se sube como `Location` a FHIR y se guarda un mapa: `establecimiento_id → location_id_fhir`
+
+### 3. **Carga de Patient**
+
+* Se recorre cada fila de pacientes.
+* Se crea un recurso `Patient` con:
+
+  * Nombre
+  * Género
+  * Fecha de nacimiento
+  * Documento
+* Se guarda un mapa: `ID_pacientes → patient_id_fhir`
+
+
+### 4. **Por cada paciente:**
+
+Se buscan sus registros en `Casos.csv` y por cada uno se:
+
+#### `Encounter`
+
+* Se crea un `Encounter` con:
+
+  * Referencia al `Patient`
+  * Fecha de consulta
+  * Ubicación (`Location`) del establecimiento
+  * Clase ambulatoria (`AMB`)
+  * Estado `finished`
+
+####  `Observation`
+
+* Se crea un `Observation` con:
+
+  * Código LOINC genérico de síntomas (`75325-1`)
+  * Texto libre de síntomas desde el CSV
+
+
+#### `Condition`
+
+* Se crea un `Condition` con:
+
+  * Diagnóstico (mapeado a código SNOMED)
+  * Clasificación (confirmed/suspect)
+  * Fecha de síntomas
+  * Relación al paciente
+
+## ¿Cómo se relacionan?
+
+* Todos los recursos usan referencias como:
+
+  * `"Patient/48264990"`
+  * `"Location/48264980"`
+* Así se construye una historia clínica **coherente y vinculada** en FHIR.
+
+##  ¿Qué lograste con esto?
+
+* Tenés una simulación de historia clínica distribuida, realista y estandarizada.
+* Usaste terminologías oficiales: **SNOMED** y **LOINC**
+* Cada paciente tiene asociado:
+
+  * Quién lo atendió (`Location`)
+  * Cuándo fue (`Encounter`)
+  * Qué síntomas tenía (`Observation`)
+  * Qué diagnóstico recibió (`Condition`)
+
+
